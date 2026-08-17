@@ -40,7 +40,8 @@ install_packages() {
   # Idempotent as-is: dnf exits 0 with "Nothing to do" when already installed.
   # On EL8 the default container-tools:rhel8 module supplies podman 4.9 plus
   # its CNI/dnsname/dnsmasq rootless-networking dependencies automatically.
-  dnf install -y podman nginx
+  # jq: JSON parsing for CyberArk CCP responses (see fetch-secrets.sh).
+  dnf install -y podman nginx jq
 }
 
 create_deploy_user() {

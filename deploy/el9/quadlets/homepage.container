@@ -10,13 +10,13 @@ ContainerName=homepage
 Network=homepage.network
 # Loopback-only: host NGINX is the front door.
 PublishPort=127.0.0.1:3000:3000
+# Topology (not environment) stays inline:
 Environment=REDIS_URL=redis://redis:6379
-Environment=HOME_LAT=40.6936
-Environment=HOME_LON=-73.9902
-# Values with spaces must be quoted whole: quadlet word-splits Environment=
-# and would truncate these to "Brooklyn," / "(homepage,".
-Environment="HOME_LABEL=Brooklyn, NY 11201"
-Environment="WEATHER_USER_AGENT=(homepage, adamtnguyen@icloud.com)"
+# Non-sensitive per-environment config, installed by install-app.sh <env>:
+EnvironmentFile=%h/.config/homepage/app.env
+# Secrets fetched from CyberArk by ExecStartPre at every start (empty file
+# when dormant — it must always exist; quadlet has no optional prefix):
+EnvironmentFile=%t/homepage/secrets.env
 HealthCmd=node backend/dist/healthcheck.js
 HealthInterval=30s
 HealthTimeout=5s
@@ -28,6 +28,8 @@ Notify=healthy
 HealthOnFailure=kill
 
 [Service]
+RuntimeDirectory=homepage
+ExecStartPre=%h/.local/bin/homepage-fetch-secrets %t/homepage/secrets.env
 Restart=always
 
 [Install]

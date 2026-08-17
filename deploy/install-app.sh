@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
 # deploy/install-app.sh — PER-APP install/update for THIS application on a
 # host already prepared by server-bootstrap.sh. Run as root from a checkout
-# of this repo. Idempotent — re-run any time to converge the installed unit
-# files and NGINX vhost on the repo's current versions (this doubles as the
+# of this repo:
+#   sudo ./deploy/install-app.sh [dev|prod]     (default: prod)
+# Idempotent — re-run any time to converge the installed unit files, env
+# config, and NGINX vhost on the repo's current versions (this doubles as the
 # "push updated units" tool).
 #
 # Boilerplate note for new apps: copy deploy/ into the new repo, then change
 # the constants below, the unit files (container/network names, a UNIQUE
-# loopback port), and the vhost (unique server_name). Server-wide steps
-# (packages, deploy user, SELinux, firewall) never repeat — they live in
-# server-bootstrap.sh.
+# loopback port), the env/*.env values, and the vhost (unique server_name).
+# Server-wide steps (packages, deploy user, SELinux, firewall) never repeat —
+# they live in server-bootstrap.sh.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME=homepage
 APP_PORT=3000               # loopback-only; must be unique per app on the host
+APP_ENV="${1:-prod}"        # which deploy/env/<env>.env this server gets
 DEPLOY_USER=deploy
 DEPLOY_HOME="/home/$DEPLOY_USER"
 EL_MAJOR=""
@@ -47,6 +50,24 @@ require_server_bootstrap() {
   command -v podman >/dev/null || die "podman missing — run server-bootstrap.sh first"
   command -v nginx >/dev/null || die "nginx missing — run server-bootstrap.sh first"
   id -u "$DEPLOY_USER" &>/dev/null || die "user $DEPLOY_USER missing — run server-bootstrap.sh first"
+}
+
+check_app_env() {
+  [[ -f "$SCRIPT_DIR/env/$APP_ENV.env" ]] ||
+    die "unknown environment '$APP_ENV' — expected one of: $(cd "$SCRIPT_DIR/env" && ls -- *.env | sed 's/\.env$//' | paste -sd' ' -)"
+  log "environment: $APP_ENV"
+}
+
+# Per-env config + the CyberArk secret fetcher (see CONFIG-AND-SECRETS.md).
+install_app_config() {
+  install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$DEPLOY_HOME/.config/$APP_NAME"
+  install -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0644 \
+    "$SCRIPT_DIR/env/$APP_ENV.env" "$DEPLOY_HOME/.config/$APP_NAME/app.env"
+  install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$DEPLOY_HOME/.local/bin"
+  install -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0755 \
+    "$SCRIPT_DIR/fetch-secrets.sh" "$DEPLOY_HOME/.local/bin/$APP_NAME-fetch-secrets"
+  # install -d owns only the FINAL directory; fix root-owned intermediates.
+  chown -R "$DEPLOY_USER:$DEPLOY_USER" "$DEPLOY_HOME/.config" "$DEPLOY_HOME/.local"
 }
 
 as_deploy() {
@@ -91,7 +112,13 @@ install_nginx_vhost() {
 print_next_steps() {
   cat <<EOF
 ============================================================
-$APP_NAME installed (EL$EL_MAJOR). Manual next steps:
+$APP_NAME installed (EL$EL_MAJOR, environment: $APP_ENV). Manual next steps:
+
+0. Secrets are DORMANT until you create
+   $DEPLOY_HOME/.config/$APP_NAME/ccp.conf (CyberArk CCP endpoint,
+   AppID, client cert, secret list — template in the header of
+   deploy/fetch-secrets.sh). Without it the service runs with the
+   non-sensitive env only. See deploy/CONFIG-AND-SECRETS.md.
 
 1. Client name resolution: this vhost answers to "$APP_NAME.lan"
    only (no catch-all). On each client machine, add to /etc/hosts:
@@ -137,6 +164,8 @@ main() {
   require_root
   check_os
   require_server_bootstrap
+  check_app_env
+  log "app config ($APP_ENV)"; install_app_config
   if [[ "$EL_MAJOR" == "9" ]]; then
     log "units (el9 quadlets)"; install_units_el9
   else

@@ -12,9 +12,14 @@ ordered checklist around them.
 sudo dnf install -y git
 git clone https://github.com/OWNER/homepage.git   # private repo: use a PAT or deploy key
 cd homepage
-sudo ./deploy/server-bootstrap.sh   # once per server, ever
-sudo ./deploy/install-app.sh        # once per app; re-run to push unit/vhost changes
+sudo ./deploy/server-bootstrap.sh        # once per server, ever
+sudo ./deploy/install-app.sh prod        # once per app (dev|prod); re-run to push changes
 ```
+
+Non-sensitive per-environment config lives in `deploy/env/<env>.env`
+(installed as `~deploy/.config/homepage/app.env`); secrets come from CyberArk
+at service start via `fetch-secrets.sh` (dormant until `ccp.conf` exists).
+The ownership model and worked example: [CONFIG-AND-SECRETS.md](CONFIG-AND-SECRETS.md).
 
 (The unit files reference `localhost/homepage:latest`, which the deploy job
 loads into local podman storage — no registry edits needed.)

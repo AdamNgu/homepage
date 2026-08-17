@@ -11,6 +11,9 @@ After=redis.service
 Environment=PODMAN_SYSTEMD_UNIT=%n
 Restart=on-failure
 TimeoutStopSec=70
+RuntimeDirectory=homepage
+# Secrets fetched from CyberArk into tmpfs at every start (empty when dormant).
+ExecStartPre=%h/.local/bin/homepage-fetch-secrets %t/homepage/secrets.env
 ExecStart=/usr/bin/podman run \
   --cidfile=%t/%n.ctr-id \
   --cgroups=no-conmon \
@@ -22,10 +25,8 @@ ExecStart=/usr/bin/podman run \
   --network homepage \
   -p 127.0.0.1:3000:3000 \
   -e REDIS_URL=redis://redis:6379 \
-  -e HOME_LAT=40.6936 \
-  -e HOME_LON=-73.9902 \
-  -e "HOME_LABEL=Brooklyn, NY 11201" \
-  -e "WEATHER_USER_AGENT=(homepage, adamtnguyen@icloud.com)" \
+  --env-file %h/.config/homepage/app.env \
+  --env-file %t/homepage/secrets.env \
   --health-cmd "node backend/dist/healthcheck.js" \
   --health-interval 30s \
   --health-timeout 5s \

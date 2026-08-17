@@ -26,10 +26,12 @@ Rocky/RHEL 8 or 9 behind host NGINX (registry-less by design — see Pipeline).
   endpoint doesn't justify a shared package.
 - `deploy/` — two idempotent bootstrap scripts (EL8 + EL9):
   `server-bootstrap.sh` runs **once per server** (packages, deploy user +
-  linger, SELinux, firewall, nginx); `install-app.sh` runs **once per app**
-  (unit files, name-based NGINX vhost, runner/first-image instructions) and is
-  the copy-me boilerplate for the next application. Plus the
-  [server runbook](deploy/server-bootstrap.md).
+  linger, SELinux, firewall, nginx); `install-app.sh [dev|prod]` runs **once
+  per app** (per-environment env file, CyberArk secret fetcher, unit files,
+  name-based NGINX vhost) and is the copy-me boilerplate for the next
+  application. Config/secrets ownership model:
+  [deploy/CONFIG-AND-SECRETS.md](deploy/CONFIG-AND-SECRETS.md). Server docs:
+  [runbook](deploy/server-bootstrap.md) + [walkthrough](deploy/WALKTHROUGH.md).
 
 ## Development
 
