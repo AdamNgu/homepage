@@ -23,7 +23,6 @@ export type LocationWeather = {
   label: string;
   isHome: boolean;
   timeZone: string;
-  updatedAt: string;
   currentHumidity: number;
   hourly: HourlyEntry[];
   today: DailySummary;

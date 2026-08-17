@@ -12,8 +12,10 @@ PublishPort=127.0.0.1:3000:3000
 Environment=REDIS_URL=redis://redis:6379
 Environment=HOME_LAT=40.6936
 Environment=HOME_LON=-73.9902
-Environment=HOME_LABEL=Brooklyn, NY 11201
-Environment=WEATHER_USER_AGENT=(homepage, adamtnguyen@icloud.com)
+# Values with spaces must be quoted whole: quadlet word-splits Environment=
+# and would truncate these to "Brooklyn," / "(homepage,".
+Environment="HOME_LABEL=Brooklyn, NY 11201"
+Environment="WEATHER_USER_AGENT=(homepage, adamtnguyen@icloud.com)"
 HealthCmd=node backend/dist/healthcheck.js
 HealthInterval=30s
 HealthTimeout=5s

@@ -49,13 +49,7 @@ const getLocationWeather = async (
     ),
   ]);
 
-  return toLocationWeather(
-    location,
-    points,
-    hourlyPeriods,
-    dailyPeriods,
-    new Date(),
-  );
+  return toLocationWeather(location, points, hourlyPeriods, dailyPeriods);
 };
 
 export const getWeather = async (): Promise<WeatherResponse> => ({

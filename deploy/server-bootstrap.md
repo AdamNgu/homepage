@@ -12,6 +12,7 @@ git clone https://github.com/OWNER/homepage.git   # private repo: use a PAT or d
 cd homepage
 # Edit OWNER in deploy/el9/quadlets/homepage.container (EL9)
 # or deploy/el8/systemd-user/homepage.service (EL8) first.
+# OWNER must be lowercase — GHCR image paths are lowercase.
 sudo ./deploy/bootstrap.sh
 ```
 

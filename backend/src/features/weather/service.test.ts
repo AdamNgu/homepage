@@ -5,7 +5,6 @@ const pointsPayload = (gridPath: string) => ({
     forecast: `https://api.weather.gov/gridpoints/${gridPath}/forecast`,
     forecastHourly: `https://api.weather.gov/gridpoints/${gridPath}/forecast/hourly`,
     timeZone: 'America/New_York',
-    relativeLocation: { properties: { city: 'New York', state: 'NY' } },
   },
 });
 

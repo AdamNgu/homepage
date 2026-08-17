@@ -38,6 +38,8 @@ const requestOnce = async (url: string): Promise<unknown> => {
 };
 
 // One retry on 5xx/network errors: gridpoint endpoints intermittently 500.
+// Timeouts and network failures are wrapped as UpstreamError so the error
+// handler reports an upstream outage (502) instead of an internal error (500).
 const request = async (url: string): Promise<unknown> => {
   try {
     return await requestOnce(url);
@@ -46,7 +48,14 @@ const request = async (url: string): Promise<unknown> => {
       throw err;
     }
     await sleep(RETRY_DELAY_MS);
-    return requestOnce(url);
+    try {
+      return await requestOnce(url);
+    } catch (retryErr) {
+      if (retryErr instanceof UpstreamError) {
+        throw retryErr;
+      }
+      throw new UpstreamError(`weather.gov unreachable: ${String(retryErr)}`, 502);
+    }
   }
 };
 

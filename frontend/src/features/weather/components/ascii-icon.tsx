@@ -12,6 +12,7 @@ export const AsciiIcon = ({
   shortForecast,
 }: AsciiIconProps) => (
   <pre
+    role="img"
     aria-label={shortForecast}
     className="font-retro-mono text-xs leading-3 font-bold"
   >

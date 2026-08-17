@@ -96,6 +96,11 @@ install_units_el8() {
 
 install_nginx_conf() {
   install -m 0644 "$SCRIPT_DIR/nginx/homepage.conf" /etc/nginx/conf.d/homepage.conf
+  # The distro nginx.conf ships its own `listen ... default_server` block,
+  # which would collide with ours (nginx -t: duplicate default server).
+  # Stripping the flag demotes that block to a never-matched fallback;
+  # idempotent on rerun.
+  sed -i 's/ default_server//g' /etc/nginx/nginx.conf
   restorecon -R /etc/nginx/conf.d "$DEPLOY_HOME/.config" || true
   nginx -t
   systemctl enable --now nginx
@@ -114,8 +119,10 @@ Bootstrap complete (EL$EL_MAJOR). Manual next steps:
      # download + extract the Linux ARM64 runner per the GitHub UI, then:
      ./config.sh --url https://github.com/OWNER/homepage --token <TOKEN>
      exit
-     sudo ~$DEPLOY_USER/actions-runner/svc.sh install $DEPLOY_USER
-     sudo ~$DEPLOY_USER/actions-runner/svc.sh start
+     # svc.sh must run from inside the runner directory:
+     cd $DEPLOY_HOME/actions-runner
+     sudo ./svc.sh install $DEPLOY_USER
+     sudo ./svc.sh start
 
 2. First image: either merge to main and let the pipeline deploy, or
    pull manually as $DEPLOY_USER with a read:packages PAT:

@@ -50,12 +50,10 @@ export const toLocationWeather = (
   points: UpstreamPoints,
   hourlyPeriods: UpstreamPeriod[],
   dailyPeriods: UpstreamPeriod[],
-  now: Date,
 ): LocationWeather => ({
   label: location.label,
   isHome: location.isHome,
   timeZone: points.timeZone,
-  updatedAt: now.toISOString(),
   currentHumidity: hourlyPeriods[0]?.relativeHumidity?.value ?? 0,
   hourly: toHourlyEntries(hourlyPeriods),
   today: toDailySummary(dailyPeriods),

@@ -1,7 +1,15 @@
+import path from 'node:path';
+
 // Dependency-free env parsing: six flat vars don't justify a schema library.
 // Revisit (e.g. Zod) once env needs unions, refinement, or grows past a screen.
+// Set-but-empty vars (Environment=PORT= in a unit file) count as missing.
+const read = (name: string): string | undefined => {
+  const raw = process.env[name];
+  return raw === undefined || raw.trim() === '' ? undefined : raw;
+};
+
 const str = (name: string, fallback?: string): string => {
-  const value = process.env[name] ?? fallback;
+  const value = read(name) ?? fallback;
   if (value === undefined) {
     throw new Error(`Missing required env var ${name}`);
   }
@@ -9,7 +17,7 @@ const str = (name: string, fallback?: string): string => {
 };
 
 const num = (name: string, fallback?: number): number => {
-  const raw = process.env[name];
+  const raw = read(name);
   if (raw === undefined) {
     if (fallback === undefined) {
       throw new Error(`Missing required env var ${name}`);
@@ -23,6 +31,8 @@ const num = (name: string, fallback?: number): number => {
   return value;
 };
 
+const staticDirRaw = read('STATIC_DIR');
+
 export const env = {
   port: num('PORT', 3000),
   redisUrl: str('REDIS_URL', 'redis://localhost:6379'),
@@ -33,5 +43,6 @@ export const env = {
     'WEATHER_USER_AGENT',
     '(homepage, adamtnguyen@icloud.com)',
   ),
-  staticDir: process.env['STATIC_DIR'],
+  // Absolute path required by res.sendFile; resolve once here.
+  staticDir: staticDirRaw === undefined ? undefined : path.resolve(staticDirRaw),
 };

@@ -13,7 +13,10 @@ export const HourlyRow = ({ entry, timeZone }: HourlyRowProps) => (
   <tr className="odd:bg-[#d4d0c8]" title={entry.shortForecast}>
     <td className="px-2 py-0.5">{formatHour(entry.time, timeZone)}</td>
     <td className="px-2 py-0.5 font-retro-mono font-bold">
-      {asciiGlyphFor(entry.iconCode, entry.shortForecast)}
+      <span aria-hidden="true">
+        {asciiGlyphFor(entry.iconCode, entry.shortForecast)}
+      </span>
+      <span className="sr-only">{entry.shortForecast}</span>
     </td>
     <td className="px-2 py-0.5 text-right font-bold">{entry.temperature}°F</td>
     <td className="px-2 py-0.5 text-right text-blue-800">

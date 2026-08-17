@@ -11,7 +11,6 @@ const weatherFixture: WeatherResponse = {
       label: 'Brooklyn, NY 11201',
       isHome: true,
       timeZone: 'America/New_York',
-      updatedAt: '2026-08-16T12:00:00.000Z',
       currentHumidity: 68,
       hourly: [
         {

@@ -8,13 +8,15 @@ client.on('error', (err: Error) => {
   console.error('[redis] error:', err.message);
 });
 
-// Resolves even when Redis is unreachable: the app must serve without its cache.
+// NOTE: node-redis's default reconnectStrategy retries ECONNREFUSED/ENOTFOUND
+// forever, so this promise may never settle while Redis is down. Callers must
+// NOT await it on the startup path — the app must serve without its cache.
 export const connectRedis = async (): Promise<void> => {
   try {
     await client.connect();
     console.log('[redis] connected');
   } catch (err) {
-    console.error('[redis] initial connect failed, running uncached:', err);
+    console.error('[redis] connect failed, running uncached:', err);
   }
 };
 

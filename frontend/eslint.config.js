@@ -32,6 +32,12 @@ export default tseslint.config(
         'error',
         {
           zones: [
+            // Cross-feature ban: extend `except` lists as features are added.
+            {
+              target: './src/features/weather',
+              from: './src/features',
+              except: ['./weather'],
+            },
             { target: './src/features', from: './src/app' },
             {
               target: ['./src/components', './src/lib', './src/testing'],

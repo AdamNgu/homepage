@@ -21,7 +21,6 @@ export type LocationWeather = {
   label: string;
   isHome: boolean;
   timeZone: string;
-  updatedAt: string;
   currentHumidity: number; // % — from hourly[0]; the daily endpoint has no humidity
   hourly: HourlyEntry[];
   today: DailySummary;
@@ -47,5 +46,4 @@ export type UpstreamPoints = {
   forecast: string;
   forecastHourly: string;
   timeZone: string;
-  relativeLocation: { properties: { city: string; state: string } };
 };
