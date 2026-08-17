@@ -2,7 +2,7 @@
 # `podman generate systemd --new` emits. Rootless Quadlet is broken on stock
 # EL8 (--cgroups=split needs cgroups v2), hence this static unit instead.
 # Install to ~/.config/systemd/user/. The `homepage` network is created by
-# deploy/bootstrap.sh.
+# deploy/install-app.sh.
 [Unit]
 Description=Redis cache for homepage
 Wants=network-online.target

@@ -24,8 +24,12 @@ Rocky/RHEL 8 or 9 behind host NGINX (registry-less by design — see Pipeline).
 - DTO types are intentionally duplicated between backend and frontend
   (`features/weather/types.ts` ↔ `features/weather/api/get-weather.ts`) — one
   endpoint doesn't justify a shared package.
-- `deploy/` — idempotent `bootstrap.sh` (EL8 + EL9), per-OS unit files, NGINX
-  vhost, and the [server runbook](deploy/server-bootstrap.md).
+- `deploy/` — two idempotent bootstrap scripts (EL8 + EL9):
+  `server-bootstrap.sh` runs **once per server** (packages, deploy user +
+  linger, SELinux, firewall, nginx); `install-app.sh` runs **once per app**
+  (unit files, name-based NGINX vhost, runner/first-image instructions) and is
+  the copy-me boilerplate for the next application. Plus the
+  [server runbook](deploy/server-bootstrap.md).
 
 ## Development
 
@@ -74,5 +78,7 @@ curl localhost:3000/healthz && open http://localhost:3000/
 ## Server setup
 
 See [deploy/server-bootstrap.md](deploy/server-bootstrap.md). Short version:
-clone, edit `OWNER` in the unit file, `sudo ./deploy/bootstrap.sh`, register
-the runner, merge to main.
+clone, `sudo ./deploy/server-bootstrap.sh` (once per server), then
+`sudo ./deploy/install-app.sh` (once per app), register the runner, add
+`homepage.lan` to your client's `/etc/hosts` (no catch-all vhost — each app
+answers only to its own hostname), merge to main.

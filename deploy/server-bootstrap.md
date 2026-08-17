@@ -1,8 +1,10 @@
 # Server bootstrap runbook
 
 Takes a greenfield Rocky/RHEL 8 or 9 ARM64 server to "serving the app via the
-release pipeline". Everything scriptable lives in [`bootstrap.sh`](bootstrap.sh);
-this runbook is the ordered checklist around it.
+release pipeline". Everything scriptable lives in two idempotent scripts —
+[`server-bootstrap.sh`](server-bootstrap.sh) (server-wide, once per host) and
+[`install-app.sh`](install-app.sh) (per application) — and this runbook is the
+ordered checklist around them.
 
 ## 1. Clone and bootstrap
 
@@ -10,29 +12,57 @@ this runbook is the ordered checklist around it.
 sudo dnf install -y git
 git clone https://github.com/OWNER/homepage.git   # private repo: use a PAT or deploy key
 cd homepage
-sudo ./deploy/bootstrap.sh
+sudo ./deploy/server-bootstrap.sh   # once per server, ever
+sudo ./deploy/install-app.sh        # once per app; re-run to push unit/vhost changes
 ```
 
 (The unit files reference `localhost/homepage:latest`, which the deploy job
 loads into local podman storage — no registry edits needed.)
 
-The script is idempotent — re-run it any time (e.g. after unit-file changes in
-the repo; it converges the installed units on the repo's versions).
+Both scripts are idempotent — re-run either at any time. `install-app.sh`
+re-copies this repo's unit files and vhost, so it doubles as the "push updated
+units" tool after config changes merge.
 
-What it does: installs podman + nginx, creates the `deploy` user with linger,
-sets the `httpd_can_network_connect` SELinux boolean (NGINX → 127.0.0.1:3000 is
-a silent 502 without it), opens http/https in firewalld, installs the per-OS
-unit files (EL9: quadlets in `~deploy/.config/containers/systemd/`; EL8: static
-podman-run units in `~deploy/.config/systemd/user/` + the `homepage` network),
-and installs/reloads the NGINX vhost.
+**server-bootstrap.sh** (server-wide): installs podman + nginx, creates the
+`deploy` user with linger, sets the `httpd_can_network_connect` SELinux boolean
+(NGINX → any 127.0.0.1 backend is a silent 502 without it), opens http/https in
+firewalld, enables nginx. Nothing app-specific.
+
+**install-app.sh** (this app): installs the per-OS unit files (EL9: quadlets in
+`~deploy/.config/containers/systemd/`; EL8: static podman-run units in
+`~deploy/.config/systemd/user/` + the `homepage` network) and the app's
+name-based NGINX vhost, then reloads nginx.
+
+### Multi-app conventions (this repo is the boilerplate)
+
+Each additional app copies `deploy/` into its own repo and changes only its
+payload: unique container/network names, a **unique loopback port** (homepage
+uses 3000), and a **unique `server_name`** in its vhost. There is deliberately
+no catch-all (`default_server`) vhost — apps answer only to their own
+hostname, so they never fight over unmatched requests (those hit the distro's
+stock test page: a useful "server up, wrong hostname" signal). Server-wide
+steps never repeat; a per-repo runner registration does.
+
+### Client name resolution (required — no catch-all)
+
+On each client (e.g. your Mac), point the app's hostname at the server:
+
+```
+# /etc/hosts
+<server-ip>  homepage.lan
+```
+
+or add the record to LAN DNS. Browsing the bare IP shows the nginx test page
+by design. (Avoid `.local` names — they collide with mDNS.)
 
 ## 2. Register the self-hosted runner
 
-As printed by the script: repo **Settings → Actions → Runners → New
+As printed by `install-app.sh`: repo **Settings → Actions → Runners → New
 self-hosted runner** (Linux ARM64), install under `/home/deploy/actions-runner`,
-then `sudo ./svc.sh install deploy && sudo ./svc.sh start`. The service runs
-jobs as `deploy`; the release workflow exports `XDG_RUNTIME_DIR` itself before
-calling `systemctl --user`.
+then from inside that directory `sudo ./svc.sh install deploy && sudo ./svc.sh
+start`. The service runs jobs as `deploy`; the release workflow exports
+`XDG_RUNTIME_DIR` itself before calling `systemctl --user`. Runners are
+per-repo on a personal account — each additional app registers its own.
 
 ## 3. First deploy
 
@@ -59,7 +89,14 @@ curl -fsS http://127.0.0.1:3000/healthz
 curl -fsS http://127.0.0.1:3000/api/weather | head -c 300
 ```
 
-From your Mac: `curl http://<server-ip>/` and open it in a browser.
+Through the vhost (Host header matters — there is no catch-all):
+
+```bash
+curl -fsS -H "Host: homepage.lan" http://127.0.0.1/      # on the server
+```
+
+From your Mac (after the `/etc/hosts` entry): `curl http://homepage.lan/` and
+open `http://homepage.lan/` in a browser.
 
 Reboot test: `sudo reboot`, wait, confirm the stack came back without a login
 (linger + `WantedBy=default.target`).
