@@ -59,18 +59,34 @@ by design. (Avoid `.local` names — they collide with mDNS.)
 
 As printed by `install-app.sh`: repo **Settings → Actions → Runners → New
 self-hosted runner** (Linux ARM64), download/extract/`./config.sh` as the
-`deploy` user under `/home/deploy/actions-runner`. Skip GitHub's final
-`./run.sh` step — that's foreground/demo mode and dies on logout. Instead
-install it as a boot-persistent service from a root shell (`svc.sh` must run
-from inside the runner directory, and `/home/deploy` is `0700`, so a plain
-admin user can't `cd` there — root can):
+`deploy` user under **`/opt/actions-runner`** — not a home directory. SELinux
+labels `/home` content `user_home_t`, which systemd services are not allowed
+to execute; a runner installed there fails with `203/EXEC` on `svc.sh start`.
+`/opt` (label `usr_t`) is the conventional place for third-party services.
+
+```bash
+sudo install -d -o deploy -g deploy /opt/actions-runner
+sudo -iu deploy
+cd /opt/actions-runner
+# download + extract + ./config.sh per the GitHub UI, then:
+exit
+```
+
+Skip GitHub's final `./run.sh` step — that's foreground/demo mode and dies on
+logout. Install it as a boot-persistent service instead (`svc.sh` must run
+from inside the runner directory, as root):
 
 ```bash
 sudo -i
-cd /home/deploy/actions-runner
+cd /opt/actions-runner
 ./svc.sh install deploy && ./svc.sh start && ./svc.sh status
 exit
 ```
+
+(If you already installed under `/home/deploy/actions-runner` and hit
+`203/EXEC`: `./svc.sh uninstall`, `mv` the directory to `/opt/actions-runner`,
+`chown -R deploy:deploy` it, `restorecon -R` it, then reinstall the service —
+no re-registration needed.)
 
 The service runs jobs as `deploy`; the release workflow exports
 `XDG_RUNTIME_DIR` itself before calling `systemctl --user`. Runners are

@@ -94,18 +94,19 @@ $APP_NAME installed (EL$EL_MAJOR). Manual next steps:
 
 2. Register this repo's GitHub Actions runner (needs a short-lived
    token from repo Settings > Actions > Runners > New self-hosted
-   runner, Linux ARM64):
+   runner, Linux ARM64). Install under /opt, NOT a home directory:
+   SELinux labels /home as user_home_t, which systemd services may
+   not execute (203/EXEC) — /opt is the conventional service home.
+     sudo install -d -o $DEPLOY_USER -g $DEPLOY_USER /opt/actions-runner
      sudo -iu $DEPLOY_USER
-     mkdir -p ~/actions-runner && cd ~/actions-runner
+     cd /opt/actions-runner
      # download + extract the runner per the GitHub UI, then:
      ./config.sh --url https://github.com/OWNER/$APP_NAME --token <TOKEN>
      exit
    Skip GitHub's './run.sh' step — that runs the runner in the
-   foreground and dies on logout. Install it as a service instead
-   (root shell: svc.sh needs the runner dir as cwd, and the deploy
-   home is 0700 so only root can enter it):
+   foreground and dies on logout. Install it as a service instead:
      sudo -i
-     cd $DEPLOY_HOME/actions-runner
+     cd /opt/actions-runner
      ./svc.sh install $DEPLOY_USER
      ./svc.sh start
      exit
