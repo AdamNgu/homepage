@@ -58,9 +58,21 @@ by design. (Avoid `.local` names — they collide with mDNS.)
 ## 2. Register the self-hosted runner
 
 As printed by `install-app.sh`: repo **Settings → Actions → Runners → New
-self-hosted runner** (Linux ARM64), install under `/home/deploy/actions-runner`,
-then from inside that directory `sudo ./svc.sh install deploy && sudo ./svc.sh
-start`. The service runs jobs as `deploy`; the release workflow exports
+self-hosted runner** (Linux ARM64), download/extract/`./config.sh` as the
+`deploy` user under `/home/deploy/actions-runner`. Skip GitHub's final
+`./run.sh` step — that's foreground/demo mode and dies on logout. Instead
+install it as a boot-persistent service from a root shell (`svc.sh` must run
+from inside the runner directory, and `/home/deploy` is `0700`, so a plain
+admin user can't `cd` there — root can):
+
+```bash
+sudo -i
+cd /home/deploy/actions-runner
+./svc.sh install deploy && ./svc.sh start && ./svc.sh status
+exit
+```
+
+The service runs jobs as `deploy`; the release workflow exports
 `XDG_RUNTIME_DIR` itself before calling `systemctl --user`. Runners are
 per-repo on a personal account — each additional app registers its own.
 

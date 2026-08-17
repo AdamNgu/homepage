@@ -100,10 +100,15 @@ $APP_NAME installed (EL$EL_MAJOR). Manual next steps:
      # download + extract the runner per the GitHub UI, then:
      ./config.sh --url https://github.com/OWNER/$APP_NAME --token <TOKEN>
      exit
-     # svc.sh must run from inside the runner directory:
+   Skip GitHub's './run.sh' step — that runs the runner in the
+   foreground and dies on logout. Install it as a service instead
+   (root shell: svc.sh needs the runner dir as cwd, and the deploy
+   home is 0700 so only root can enter it):
+     sudo -i
      cd $DEPLOY_HOME/actions-runner
-     sudo ./svc.sh install $DEPLOY_USER
-     sudo ./svc.sh start
+     ./svc.sh install $DEPLOY_USER
+     ./svc.sh start
+     exit
 
 3. First image (no registry in this setup): merge to main and let
    the pipeline build + deploy it, or build once from this checkout
