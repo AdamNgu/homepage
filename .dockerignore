@@ -1,0 +1,7 @@
+.git
+.github
+deploy
+node_modules
+**/node_modules
+**/dist
+*.md
