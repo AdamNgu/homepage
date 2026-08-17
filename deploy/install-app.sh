@@ -59,6 +59,9 @@ install_units_el9() {
   install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$dest"
   install -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0644 \
     "$SCRIPT_DIR"/el9/quadlets/* "$dest/"
+  # install -d owns only the FINAL directory; intermediates (~/.config
+  # itself) are created root-owned, which podman-as-deploy refuses to use.
+  chown -R "$DEPLOY_USER:$DEPLOY_USER" "$DEPLOY_HOME/.config"
   as_deploy systemctl --user daemon-reload
 }
 
@@ -68,6 +71,9 @@ install_units_el8() {
   install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$dest"
   install -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 0644 \
     "$SCRIPT_DIR"/el8/systemd-user/* "$dest/"
+  # See install_units_el9: fix root-owned intermediate dirs BEFORE any
+  # podman-as-deploy call below.
+  chown -R "$DEPLOY_USER:$DEPLOY_USER" "$DEPLOY_HOME/.config"
   # The quadlet .network equivalent, done imperatively on EL8.
   as_deploy podman network exists "$APP_NAME" ||
     as_deploy podman network create "$APP_NAME"
