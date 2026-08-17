@@ -94,7 +94,10 @@ per-repo on a personal account — each additional app registers its own.
 
 ## 3. First deploy
 
-Merge to `main` (or re-run the Release workflow). The `build` job produces the
+Merge to `main`, or use **Actions → Release → Run workflow** (manual
+dispatch — always runs current main). **Do not re-run old runs to deploy**:
+a run executes the workflow file as of its own commit, not today's main, so
+re-running a stale run replays history. The `build` job produces the
 image as an OCI-archive pipeline artifact (no registry involved); the `deploy`
 job downloads it, `podman load`s it, tags `localhost/homepage:latest` +
 `:sha-<commit>`, restarts `homepage.service`, and curls `/healthz` until
@@ -124,7 +127,11 @@ curl -fsS -H "Host: homepage.lan" http://127.0.0.1/      # on the server
 ```
 
 From your Mac (after the `/etc/hosts` entry): `curl http://homepage.lan/` and
-open `http://homepage.lan/` in a browser.
+open **`http://homepage.lan/`** in a browser — type the `http://` scheme
+explicitly. Browsers treat bare `.lan` names as search queries and/or
+auto-upgrade to HTTPS (443 is closed by design → "can't be reached"). If
+Chrome still fails: disable Settings → Security → "Always use secure
+connections"; note "Use secure DNS" (DoH) can bypass `/etc/hosts`.
 
 Reboot test: `sudo reboot`, wait, confirm the stack came back without a login
 (linger + `WantedBy=default.target`).

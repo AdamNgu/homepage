@@ -77,7 +77,9 @@ curl localhost:3000/healthz && open http://localhost:3000/
 
 ## Server setup
 
-See [deploy/server-bootstrap.md](deploy/server-bootstrap.md). Short version:
+See [deploy/server-bootstrap.md](deploy/server-bootstrap.md) (quick
+reference) and [deploy/WALKTHROUGH.md](deploy/WALKTHROUGH.md) (from-zero
+guide with the why behind each step and the failures we hit). Short version:
 clone, `sudo ./deploy/server-bootstrap.sh` (once per server), then
 `sudo ./deploy/install-app.sh` (once per app), register the runner, add
 `homepage.lan` to your client's `/etc/hosts` (no catch-all vhost — each app
