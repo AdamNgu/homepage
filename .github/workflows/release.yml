@@ -50,6 +50,13 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@v4
+      - name: Converge server config
+        # bootstrap.sh is idempotent; the first manual bootstrap installed a
+        # sudoers drop-in permitting exactly this script path. Every deploy
+        # re-applies packages/SELinux/firewall/unit files/nginx from the repo,
+        # so unit-file changes ship through the pipeline, not SSH.
+        run: sudo ./deploy/bootstrap.sh
       - uses: actions/download-artifact@v4
         with:
           name: homepage-image

@@ -57,10 +57,13 @@ curl localhost:3000/healthz && open http://localhost:3000/
   container registry available yet; procurement pending):
   1. `build` — native arm64 image build on `ubuntu-24.04-arm`, exported as an
      OCI archive and uploaded as a pipeline artifact (2-day retention).
-  2. `deploy` — runs on the self-hosted runner on the server: downloads the
-     artifact, `podman load`, tags `localhost/homepage:latest` +
-     `:sha-<commit>`, `systemctl --user restart homepage.service`, curl
-     `/healthz` loop, prunes to the 5 newest sha images.
+  2. `deploy` — runs on the self-hosted runner on the server: checkout →
+     `sudo deploy/bootstrap.sh` (idempotent config convergence via a
+     path-pinned sudoers grant — note: merge access to main therefore implies
+     root on the server) → download artifact → `podman load` → tag
+     `localhost/homepage:latest` + `:sha-<commit>` → `systemctl --user restart
+     homepage.service` → curl `/healthz` loop → prune to the 5 newest sha
+     images.
 - Deploys track `:latest`; the local `sha-*` images are the rollback store
   (artifacts expire — see runbook). The server needs zero registry access.
 - When a registry is procured: restore the GHCR login/metadata/push flow (in
@@ -73,6 +76,12 @@ curl localhost:3000/healthz && open http://localhost:3000/
 
 ## Server setup
 
-See [deploy/server-bootstrap.md](deploy/server-bootstrap.md). Short version:
-clone, edit `OWNER` in the unit file, `sudo ./deploy/bootstrap.sh`, register
-the runner, merge to main.
+See [deploy/server-bootstrap.md](deploy/server-bootstrap.md). Short version —
+three commands on a fresh (or wiped) server, then merges deploy everything
+(each deploy re-runs `bootstrap.sh` for config convergence):
+
+```bash
+git clone https://github.com/AdamNgu/homepage.git && cd homepage
+sudo ./deploy/bootstrap.sh
+sudo ./deploy/install-runner.sh <REGISTRATION_TOKEN>
+```
