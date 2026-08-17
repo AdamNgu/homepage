@@ -62,6 +62,8 @@ curl localhost:3000/healthz && open http://localhost:3000/
 - Deploys track `:latest`; `sha-*` tags exist for traceability and manual
   rollback (see runbook). Keep the repo **private** — self-hosted runners on
   public repos are a security risk.
+- Branch protection requiring the `verify` check needs GitHub Pro on private
+  repos; until then the PR-before-merge flow is a team convention.
 
 ## Server setup
 
