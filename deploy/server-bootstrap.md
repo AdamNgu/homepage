@@ -1,51 +1,53 @@
 # Server bootstrap runbook
 
 Takes a greenfield Rocky/RHEL 8 or 9 ARM64 server to "serving the app via the
-release pipeline" in three commands. A server wipe is the same three commands.
-After that, **every deploy re-runs `bootstrap.sh` from the pipeline**, so
-server config (packages, SELinux, firewall, unit files, nginx vhost) converges
-on the repo's versions with no SSH involved.
+release pipeline". Everything scriptable lives in [`bootstrap.sh`](bootstrap.sh);
+this runbook is the ordered checklist around it.
 
-## New server (or after a wipe)
+## 1. Clone and bootstrap
 
 ```bash
-# 1. Get the repo (private: use a fine-grained PAT with Contents: Read)
 sudo dnf install -y git
-git clone https://github.com/AdamNgu/homepage.git && cd homepage
-
-# 2. Bootstrap the OS (idempotent: packages, deploy user + linger, SELinux
-#    boolean, firewalld, unit files, nginx vhost, pipeline sudoers grant)
+git clone https://github.com/OWNER/homepage.git   # private repo: use a PAT or deploy key
+cd homepage
 sudo ./deploy/bootstrap.sh
-
-# 3. Install + register the Actions runner (token from repo Settings >
-#    Actions > Runners > New self-hosted runner; expires ~1h)
-sudo ./deploy/install-runner.sh <REGISTRATION_TOKEN>
 ```
 
-Then trigger a deploy: merge to `main`, or re-run the latest Release workflow
-from the Actions tab. If a `deploy` job is already sitting in "queued", it
-picks up the new runner automatically. The initial clone is only needed for
-these two scripts — afterwards the runner's checkout supplies everything.
+(The unit files reference `localhost/homepage:latest`, which the deploy job
+loads into local podman storage — no registry edits needed.)
 
-## What a deploy does
+The script is idempotent — re-run it any time (e.g. after unit-file changes in
+the repo; it converges the installed units on the repo's versions).
 
-The `build` job produces the image as an OCI-archive pipeline artifact (no
-registry involved). The `deploy` job, on this server: checks out the repo →
-`sudo deploy/bootstrap.sh` (config convergence; permitted by a sudoers
-drop-in pinned to that path) → downloads the artifact → `podman load` → tags
-`localhost/homepage:latest` + `:sha-<commit>` → `systemctl --user restart
-homepage.service` → curls `/healthz` until healthy → prunes to the 5 newest
-sha images.
+What it does: installs podman + nginx, creates the `deploy` user with linger,
+sets the `httpd_can_network_connect` SELinux boolean (NGINX → 127.0.0.1:3000 is
+a silent 502 without it), opens http/https in firewalld, installs the per-OS
+unit files (EL9: quadlets in `~deploy/.config/containers/systemd/`; EL8: static
+podman-run units in `~deploy/.config/systemd/user/` + the `homepage` network),
+and installs/reloads the NGINX vhost.
 
-The app image needs no registry access — base layers ride inside the
+## 2. Register the self-hosted runner
+
+As printed by the script: repo **Settings → Actions → Runners → New
+self-hosted runner** (Linux ARM64), install under `/home/deploy/actions-runner`,
+then `sudo ./svc.sh install deploy && sudo ./svc.sh start`. The service runs
+jobs as `deploy`; the release workflow exports `XDG_RUNTIME_DIR` itself before
+calling `systemctl --user`.
+
+## 3. First deploy
+
+Merge to `main` (or re-run the Release workflow). The `build` job produces the
+image as an OCI-archive pipeline artifact (no registry involved); the `deploy`
+job downloads it, `podman load`s it, tags `localhost/homepage:latest` +
+`:sha-<commit>`, restarts `homepage.service`, and curls `/healthz` until
+healthy. The app image needs no registry access — base layers ride inside the
 artifact. (Redis is the one remaining public pull: starting `redis.service`
 fetches `docker.io/library/redis:7-alpine` once. On a network where that's
 blocked, `podman save/load` it from any machine that can pull.)
 
-**Security trade-off, stated plainly:** the sudoers grant pins the script
-*path*, but the script *content* comes from `main` — merge access to main
-implies root on this server. Acceptable for a LAN reference box; in a corporate
-setup, gate it with branch protection and environment approval rules.
+Manual alternative (before the runner exists): build once from the checkout as
+`deploy` — `podman build -t localhost/homepage:latest -f Containerfile .` —
+then `systemctl --user start redis.service homepage.service`.
 
 ## 4. Smoke checks
 

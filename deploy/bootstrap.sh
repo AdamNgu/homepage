@@ -13,9 +13,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_USER=deploy
 DEPLOY_HOME="/home/$DEPLOY_USER"
-# Where the runner checks out this repo; the sudoers grant pins this path so
-# the deploy job can re-run this script for convergence on every deploy.
-PIPELINE_SCRIPT="$DEPLOY_HOME/actions-runner/_work/homepage/homepage/deploy/bootstrap.sh"
 EL_MAJOR=""
 
 log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
@@ -52,18 +49,6 @@ create_deploy_user() {
   # Without linger the user's systemd manager (and every container in it)
   # only exists while a session is open.
   loginctl enable-linger "$DEPLOY_USER"
-}
-
-configure_pipeline_sudo() {
-  # Lets the deploy job run `sudo deploy/bootstrap.sh` from the runner's
-  # checkout, so server config converges on every deploy instead of via SSH.
-  # Accepted trade-off (see README): the path is pinned but the content comes
-  # from main, so merge access to main implies root on this server.
-  local f=/etc/sudoers.d/homepage-deploy
-  printf '%s ALL=(root) NOPASSWD: %s\n' "$DEPLOY_USER" "$PIPELINE_SCRIPT" >"$f.tmp"
-  chmod 0440 "$f.tmp"
-  visudo -cf "$f.tmp"
-  mv "$f.tmp" "$f"
 }
 
 as_deploy() {
@@ -123,19 +108,27 @@ install_nginx_conf() {
 }
 
 print_next_steps() {
-  # Quiet in pipeline runs — the steps below only matter on a fresh server.
-  [[ "${GITHUB_ACTIONS:-}" == "true" ]] && return 0
   cat <<EOF
 ============================================================
-Bootstrap complete (EL$EL_MAJOR). Remaining steps on a fresh server:
+Bootstrap complete (EL$EL_MAJOR). Manual next steps:
 
-1. Install + register the GitHub Actions runner (token from repo
-   Settings > Actions > Runners > New self-hosted runner):
-     sudo $SCRIPT_DIR/install-runner.sh <TOKEN>
+1. Register the GitHub Actions runner (needs a short-lived token
+   from repo Settings > Actions > Runners > New self-hosted runner):
+     sudo -iu $DEPLOY_USER
+     mkdir -p ~/actions-runner && cd ~/actions-runner
+     # download + extract the Linux ARM64 runner per the GitHub UI, then:
+     ./config.sh --url https://github.com/OWNER/homepage --token <TOKEN>
+     exit
+     # svc.sh must run from inside the runner directory:
+     cd $DEPLOY_HOME/actions-runner
+     sudo ./svc.sh install $DEPLOY_USER
+     sudo ./svc.sh start
 
-2. Trigger a deploy: merge to main, or re-run the latest Release
-   workflow — a queued deploy job picks the runner up automatically.
-   From then on every deploy re-runs this script for convergence.
+2. First image (no registry in this setup): merge to main and let the
+   pipeline build + deploy it, or build once from this checkout as
+   $DEPLOY_USER:
+     podman build -t localhost/homepage:latest -f Containerfile .
+     systemctl --user start redis.service homepage.service
 
 3. Smoke check:
      curl -fsS http://127.0.0.1:3000/healthz
@@ -152,7 +145,6 @@ main() {
   check_os
   log "packages"; install_packages
   log "deploy user"; create_deploy_user
-  log "pipeline sudo"; configure_pipeline_sudo
   log "selinux"; configure_selinux
   log "firewall"; configure_firewall
   if [[ "$EL_MAJOR" == "9" ]]; then
