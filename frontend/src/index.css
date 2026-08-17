@@ -45,5 +45,6 @@ body {
 }
 
 @utility animate-marquee {
-  animation: marquee-scroll 18s linear infinite;
+  /* Negative delay starts the ticker mid-flight instead of off-screen. */
+  animation: marquee-scroll 18s linear -9s infinite;
 }
