@@ -4,7 +4,8 @@ Requires=redis.service
 After=redis.service
 
 [Container]
-Image=ghcr.io/OWNER/homepage:latest
+# Loaded into local storage by the deploy job (registry-less artifact flow).
+Image=localhost/homepage:latest
 ContainerName=homepage
 Network=homepage.network
 # Loopback-only: host NGINX is the front door.

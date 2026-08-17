@@ -124,10 +124,10 @@ Bootstrap complete (EL$EL_MAJOR). Manual next steps:
      sudo ./svc.sh install $DEPLOY_USER
      sudo ./svc.sh start
 
-2. First image: either merge to main and let the pipeline deploy, or
-   pull manually as $DEPLOY_USER with a read:packages PAT:
-     podman login ghcr.io --authfile ~/.config/containers/auth.json
-     podman pull ghcr.io/OWNER/homepage:latest
+2. First image (no registry in this setup): merge to main and let the
+   pipeline build + deploy it, or build once from this checkout as
+   $DEPLOY_USER:
+     podman build -t localhost/homepage:latest -f Containerfile .
      systemctl --user start redis.service homepage.service
 
 3. Smoke check:

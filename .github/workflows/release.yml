@@ -1,5 +1,11 @@
 name: Release
 
+# Registry-less flow: the image travels as a pipeline artifact (build once,
+# promote the exact artifact). No registry access is needed anywhere — the
+# server never talks to GHCR/docker.io at deploy time. When a registry is
+# procured, restore the login/metadata-action/push steps (see git history,
+# GHCR flow through commit ccfccda) and point the unit files back at it.
+
 on:
   push:
     branches: [main]
@@ -9,56 +15,51 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-push:
+  build:
     # Native arm64 build (no QEMU) — matches the RHEL-family arm64 servers.
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
       # Buildx is still required for type=gha layer caching.
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: Containerfile
           platforms: linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: localhost/homepage:latest
+          outputs: type=oci,dest=/tmp/homepage-image.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
+      - name: Report image size
+        run: ls -lh /tmp/homepage-image.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: homepage-image
+          path: /tmp/homepage-image.tar
+          retention-days: 2
+          if-no-files-found: error
 
   deploy:
-    needs: build-push
+    needs: build
     # Self-hosted runner on the LAN server, running as the `deploy` user.
     runs-on: [self-hosted]
     permissions:
       contents: read
-      packages: read
     steps:
-      - name: Resolve image ref
-        # GHCR paths are lowercase (metadata-action lowercases the pushed
-        # tags), but github.repository preserves the owner's case.
-        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}:latest" >> "$GITHUB_ENV"
-      - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Pull image
-        run: podman pull "$IMAGE"
+      - uses: actions/download-artifact@v4
+        with:
+          name: homepage-image
+      - name: Load and tag image
+        # OCI archives load as an untagged image ID; tag it explicitly.
+        # sha-* tags are the local rollback store (see runbook).
+        run: |
+          LOADED=$(podman load -q -i homepage-image.tar | tail -1 | awk '{print $NF}')
+          podman tag "$LOADED" "localhost/homepage:sha-${GITHUB_SHA::7}"
+          podman tag "$LOADED" localhost/homepage:latest
       - name: Restart service
         # On EL9 (Notify=healthy) this blocks until the container passes its
         # health check and fails the job on a bad image. Runner jobs have no
@@ -74,3 +75,10 @@ jobs:
           done
           echo "service did not become healthy" >&2
           exit 1
+      - name: Prune old images
+        # Keep the 5 newest sha-* tags for rollback; drop the rest + dangling.
+        run: |
+          podman images --format '{{.Tag}}' localhost/homepage \
+            | { grep '^sha-' || true; } | tail -n +6 \
+            | xargs -r -I{} podman rmi "localhost/homepage:{}"
+          podman image prune -f >/dev/null

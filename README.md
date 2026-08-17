@@ -6,8 +6,8 @@ by [api.weather.gov](https://www.weather.gov/documentation/services-web-api).
 If the configured home is outside NYC, the page also shows New York City
 (dormant while home = 11201; covered by tests). Doubles as a reference
 implementation of a corporate-like container pipeline:
-GitHub Actions → GHCR → self-hosted runner → rootless Podman on
-Rocky/RHEL 8 or 9 behind host NGINX.
+GitHub Actions → image artifact → self-hosted runner → rootless Podman on
+Rocky/RHEL 8 or 9 behind host NGINX (registry-less by design — see Pipeline).
 
 ## Architecture
 
@@ -53,15 +53,21 @@ curl localhost:3000/healthz && open http://localhost:3000/
 ## Pipeline
 
 - **CI** (`ci.yml`): PRs run lint, typecheck, tests, and builds.
-- **Release** (`release.yml`), on merge to `main`:
-  1. `build-push` — native arm64 image build on `ubuntu-24.04-arm`, pushed to
-     `ghcr.io/OWNER/homepage` as `:latest` + `:sha-<commit>`.
-  2. `deploy` — runs on the self-hosted runner on the server: job-scoped
-     `GITHUB_TOKEN` login to GHCR (no long-lived PAT on the server), pull,
-     `systemctl --user restart homepage.service`, curl `/healthz` loop.
-- Deploys track `:latest`; `sha-*` tags exist for traceability and manual
-  rollback (see runbook). Keep the repo **private** — self-hosted runners on
-  public repos are a security risk.
+- **Release** (`release.yml`), on merge to `main` — **registry-less** (no
+  container registry available yet; procurement pending):
+  1. `build` — native arm64 image build on `ubuntu-24.04-arm`, exported as an
+     OCI archive and uploaded as a pipeline artifact (2-day retention).
+  2. `deploy` — runs on the self-hosted runner on the server: downloads the
+     artifact, `podman load`, tags `localhost/homepage:latest` +
+     `:sha-<commit>`, `systemctl --user restart homepage.service`, curl
+     `/healthz` loop, prunes to the 5 newest sha images.
+- Deploys track `:latest`; the local `sha-*` images are the rollback store
+  (artifacts expire — see runbook). The server needs zero registry access.
+- When a registry is procured: restore the GHCR login/metadata/push flow (in
+  git history through commit `ccfccda`) and point the unit files' `Image=`
+  back at the registry ref — nothing else changes.
+- Keep the repo **private** — self-hosted runners on public repos are a
+  security risk.
 - Branch protection requiring the `verify` check needs GitHub Pro on private
   repos; until then the PR-before-merge flow is a team convention.
 

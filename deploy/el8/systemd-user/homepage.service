@@ -32,7 +32,7 @@ ExecStart=/usr/bin/podman run \
   --health-retries 3 \
   --health-start-period 10s \
   --health-on-failure kill \
-  ghcr.io/OWNER/homepage:latest
+  localhost/homepage:latest
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify

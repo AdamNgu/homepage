@@ -10,11 +10,11 @@ this runbook is the ordered checklist around it.
 sudo dnf install -y git
 git clone https://github.com/OWNER/homepage.git   # private repo: use a PAT or deploy key
 cd homepage
-# Edit OWNER in deploy/el9/quadlets/homepage.container (EL9)
-# or deploy/el8/systemd-user/homepage.service (EL8) first.
-# OWNER must be lowercase — GHCR image paths are lowercase.
 sudo ./deploy/bootstrap.sh
 ```
+
+(The unit files reference `localhost/homepage:latest`, which the deploy job
+loads into local podman storage — no registry edits needed.)
 
 The script is idempotent — re-run it any time (e.g. after unit-file changes in
 the repo; it converges the installed units on the repo's versions).
@@ -36,14 +36,18 @@ calling `systemctl --user`.
 
 ## 3. First deploy
 
-Merge to `main` (or re-run the Release workflow). The `deploy` job logs in to
-GHCR with its job-scoped `GITHUB_TOKEN`, pulls `:latest`, restarts
-`homepage.service`, and curls `/healthz` until healthy.
+Merge to `main` (or re-run the Release workflow). The `build` job produces the
+image as an OCI-archive pipeline artifact (no registry involved); the `deploy`
+job downloads it, `podman load`s it, tags `localhost/homepage:latest` +
+`:sha-<commit>`, restarts `homepage.service`, and curls `/healthz` until
+healthy. The app image needs no registry access — base layers ride inside the
+artifact. (Redis is the one remaining public pull: starting `redis.service`
+fetches `docker.io/library/redis:7-alpine` once. On a network where that's
+blocked, `podman save/load` it from any machine that can pull.)
 
-Manual alternative (before the runner exists): see step 2 of the script's
-"next steps" output — `podman login` with a `read:packages` PAT persisted to
-`~/.config/containers/auth.json` (the default login path is under `/run` and
-does not survive reboot).
+Manual alternative (before the runner exists): build once from the checkout as
+`deploy` — `podman build -t localhost/homepage:latest -f Containerfile .` —
+then `systemctl --user start redis.service homepage.service`.
 
 ## 4. Smoke checks
 
@@ -75,13 +79,15 @@ EL8/Rocky 8 maintenance ends **May 2029** — plan EL9 migrations accordingly.
 
 ## Rollback
 
-Every release also pushes a `sha-<commit>` tag:
+Every deploy tags the loaded image `sha-<commit>` and the deploy job keeps the
+5 newest in local podman storage (pipeline artifacts expire after 2 days and
+are NOT the rollback store):
 
 ```bash
 sudo -iu deploy
 export XDG_RUNTIME_DIR=/run/user/$(id -u)
-podman pull ghcr.io/OWNER/homepage:sha-<good-commit>
-podman tag ghcr.io/OWNER/homepage:sha-<good-commit> ghcr.io/OWNER/homepage:latest
+podman images localhost/homepage        # see what's on hand
+podman tag localhost/homepage:sha-<good-commit> localhost/homepage:latest
 systemctl --user restart homepage.service
 ```
 
