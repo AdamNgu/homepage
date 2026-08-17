@@ -1,0 +1,31 @@
+# Rootless podman unit for RHEL/Rocky 8 (podman 4.9, cgroups v1) in the style
+# `podman generate systemd --new` emits. Rootless Quadlet is broken on stock
+# EL8 (--cgroups=split needs cgroups v2), hence this static unit instead.
+# Install to ~/.config/systemd/user/. The `homepage` network is created by
+# deploy/bootstrap.sh.
+[Unit]
+Description=Redis cache for homepage
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+Restart=on-failure
+TimeoutStopSec=70
+ExecStart=/usr/bin/podman run \
+  --cidfile=%t/%n.ctr-id \
+  --cgroups=no-conmon \
+  --sdnotify=conmon \
+  --rm \
+  --replace \
+  -d \
+  --name redis \
+  --network homepage \
+  docker.io/library/redis:7-alpine
+ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
+ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
+Type=notify
+NotifyAccess=all
+
+[Install]
+WantedBy=default.target

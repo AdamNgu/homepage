@@ -1,0 +1,31 @@
+[Unit]
+Description=Homepage app
+Requires=redis.service
+After=redis.service
+
+[Container]
+Image=ghcr.io/OWNER/homepage:latest
+ContainerName=homepage
+Network=homepage.network
+# Loopback-only: host NGINX is the front door.
+PublishPort=127.0.0.1:3000:3000
+Environment=REDIS_URL=redis://redis:6379
+Environment=HOME_LAT=40.6936
+Environment=HOME_LON=-73.9902
+Environment=HOME_LABEL=Brooklyn, NY 11201
+Environment=WEATHER_USER_AGENT=(homepage, adamtnguyen@icloud.com)
+HealthCmd=node backend/dist/healthcheck.js
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=10s
+# systemd counts the start as successful only once the health check passes,
+# so `systemctl --user restart` fails on a broken image (deploy job catches it).
+Notify=healthy
+HealthOnFailure=kill
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

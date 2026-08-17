@@ -1,0 +1,41 @@
+# Rootless podman unit for RHEL/Rocky 8 — see redis.service header for why
+# this is a static unit rather than a Quadlet.
+# NOTE: never --sdnotify=healthy here; it panics rootless on podman < 5.2
+# (EL8 ships 4.9 forever). The pipeline's curl loop is the health gate on EL8.
+[Unit]
+Description=Homepage app
+Requires=redis.service
+After=redis.service
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+Restart=on-failure
+TimeoutStopSec=70
+ExecStart=/usr/bin/podman run \
+  --cidfile=%t/%n.ctr-id \
+  --cgroups=no-conmon \
+  --sdnotify=conmon \
+  --rm \
+  --replace \
+  -d \
+  --name homepage \
+  --network homepage \
+  -p 127.0.0.1:3000:3000 \
+  -e REDIS_URL=redis://redis:6379 \
+  -e HOME_LAT=40.6936 \
+  -e HOME_LON=-73.9902 \
+  -e "HOME_LABEL=Brooklyn, NY 11201" \
+  -e "WEATHER_USER_AGENT=(homepage, adamtnguyen@icloud.com)" \
+  --health-cmd "node backend/dist/healthcheck.js" \
+  --health-interval 30s \
+  --health-timeout 5s \
+  --health-retries 3 \
+  --health-start-period 10s \
+  ghcr.io/OWNER/homepage:latest
+ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
+ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
+Type=notify
+NotifyAccess=all
+
+[Install]
+WantedBy=default.target

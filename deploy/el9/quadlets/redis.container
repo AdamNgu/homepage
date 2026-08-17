@@ -1,0 +1,14 @@
+[Unit]
+Description=Redis cache for homepage
+
+[Container]
+Image=docker.io/library/redis:7-alpine
+ContainerName=redis
+Network=homepage.network
+# Pure cache: no volume on purpose — a restart costs one upstream refetch.
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
