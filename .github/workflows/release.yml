@@ -9,6 +9,10 @@ name: Release
 on:
   push:
     branches: [main]
+  # Manual trigger (Actions > Release > Run workflow): always deploys current
+  # main. Note: RE-running an old run executes that commit's workflow, not
+  # main's — use this instead of re-running stale runs.
+  workflow_dispatch:
 
 concurrency:
   group: release
